@@ -174,12 +174,11 @@ abstract class Dispatch {
         }
 
         preg_match_all("~\{\s* ([a-zA-Z_][a-zA-Z0-9_-]*) \}~x", $route, $keys, PREG_SET_ORDER);
-        $routeDiff = array_values(array_diff(explode("/", $this->patch), explode("/", $route)));
+        $routeDiff = $this->routeDiff($this->patch, $route);
 
         $this->formSpoofing();
-        $offset = ($this->group ? 1 : 0);
-        foreach ($keys as $key) {
-            $this->data[$key[1]] = ($routeDiff[$offset++] ?? null);
+        foreach ($keys as $offset => $key) {
+            $this->data[$key[1]] = ($routeDiff[$offset] ?? null);
         }
 
         $route = (!$this->group ? $route : "/{$this->group}{$route}");
@@ -249,4 +248,33 @@ abstract class Dispatch {
     private function action($handler): ?string {
         return (!is_string($handler) ?: (explode($this->separator, $handler)[1] ?? null));
     }
+
+
+    /**
+     * @param string $patch
+     * @param string $route
+     * @return array
+     */
+    private function routeDiff(string $patch, string $route): array
+    {
+        $new_patch = array_filter(explode("/", $patch));
+        $new_route = array_filter(explode("/", $route));
+
+        array_unshift($new_route, $this->group);
+
+        $a = array_filter($new_route, array($this, 'callbackFilter'));
+        $routeDiff = str_replace(implode('/', $a), '', implode('/', $new_patch));
+
+        return array_values(array_filter(explode("/", $routeDiff)));
+    }
+
+    /**
+     * @param string|null $element
+     * @return string|null
+     */
+    private function callbackFilter(?string $element): ?string
+    {
+        return preg_match('/^([a-zA-Z_][a-zA-Z0-9_-]*)+$/', $element);
+    }
+
 }
